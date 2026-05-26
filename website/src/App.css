@@ -1,0 +1,83 @@
+.app-shell {
+  position: relative;
+  min-height: 100vh;
+}
+
+.app-shell > .form-bg-wrapper {
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+
+.brand-logo-card {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 14px rgba(15, 23, 42, 0.1);
+  border: 1px solid #e2e8f0;
+  text-decoration: none;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.brand-logo-card:hover {
+  box-shadow: 0 4px 20px rgba(15, 23, 42, 0.14);
+  transform: translateY(-1px);
+}
+
+.brand-logo {
+  display: block;
+  width: clamp(96px, 18vw, 140px);
+  height: auto;
+  object-fit: contain;
+}
+
+@media (max-width: 700px) {
+  .brand-logo-card {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    padding: 8px 10px;
+  }
+
+  .brand-logo {
+    width: clamp(80px, 28vw, 112px);
+  }
+
+  .app-shell > .form-bg-wrapper {
+    padding-top: 100px;
+  }
+}
+
+.footer-powered {
+  width: 100%;
+  text-align: center;
+  padding: 18px 0 14px 0;
+  background: linear-gradient(120deg, #f1f5f9 60%, #e0e7ef 100%);
+  color: #334155;
+  font-size: 1.18rem;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  z-index: 10;
+  box-shadow: 0 -2px 8px rgba(99,102,241,0.07);
+}
+.footer-brand {
+  color: #6366f1;
+  font-weight: 900;
+  letter-spacing: 1px;
+  margin-left: 4px;
+}
+
+@media (max-width: 700px) {
+  .email-form {
+    margin-bottom: 100px;
+  }
+}

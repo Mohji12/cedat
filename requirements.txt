@@ -1,0 +1,9 @@
+uvicorn
+fastapi
+python-multipart
+python-dotenv
+pandas
+openpyxl
+cloudinary
+mangum
+requests
