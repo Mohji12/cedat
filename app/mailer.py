@@ -1,15 +1,27 @@
-import requests
 import json
-import base64
 import os
 import re
+from pathlib import Path
+
+import requests
+from dotenv import load_dotenv
+
+_APP_DIR = Path(__file__).resolve().parent
+_PROJECT_ROOT = _APP_DIR.parent
+
+
+def _load_env() -> None:
+    load_dotenv(_PROJECT_ROOT / ".env", override=True)
+    load_dotenv(_APP_DIR / ".env", override=True)
+
 
 def send_email(to_email: str, subject: str, body: str, banner_url: str):
     """
     Sends email using ZeptoMail REST API.
     This version is for the E drive codebase which uses a single banner_url string.
     """
-    zepto_token = os.getenv("SMTP_PASSWORD") or os.getenv("ZEPTO_API_TOKEN")
+    _load_env()
+    zepto_token = (os.getenv("SMTP_PASSWORD") or os.getenv("ZEPTO_API_TOKEN") or "").strip()
     if not zepto_token:
         raise RuntimeError("Missing SMTP_PASSWORD or ZEPTO_API_TOKEN in environment.")
     SENDER_EMAIL = os.getenv("SENDER_EMAIL", "support@harishcriticalcareclasses.com")
@@ -25,7 +37,7 @@ def send_email(to_email: str, subject: str, body: str, banner_url: str):
         return f"""
         <div style="text-align:center;">
             <a href="{url}" style="display:inline-block;padding:10px 20px;background-color:#00c59a;color:white;text-decoration:none;border-radius:5px;">
-                Register Now
+                Click Here
             </a>
         </div>
         """

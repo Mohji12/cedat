@@ -66,11 +66,7 @@ def upload_banner(file_content: bytes, original_filename: str) -> str:
 
 
 def upload_recipient_list(file_content: bytes, original_filename: str) -> dict[str, str]:
-    """
-    Archive CSV/Excel on Cloudinary (contains PII).
-    Uses folder cedat/email-lists, resource_type raw, access_control none (not public CDN).
-    Returns public_id and asset_folder for logging / API response.
-    """
+    """Archive one CSV/Excel file privately on Cloudinary."""
     _configure()
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     uid = uuid.uuid4().hex[:10]
@@ -88,10 +84,20 @@ def upload_recipient_list(file_content: bytes, original_filename: str) -> dict[s
 
     public_id = str(result["public_id"])
     asset_folder = str(result.get("asset_folder") or "cedat/email-lists")
-    print(f"Stored recipient list on Cloudinary: public_id={public_id} folder={asset_folder}")
+    print(
+        f"Stored recipient list on Cloudinary: public_id={public_id} "
+        f"folder={asset_folder} bytes={len(file_content)}"
+    )
 
     return {
         "public_id": public_id,
         "folder": asset_folder,
         "resource_type": str(result.get("resource_type", "raw")),
+        "filename": safe_name,
+        "bytes": str(len(file_content)),
     }
+
+
+def upload_all_recipient_lists(files: list[tuple[bytes, str]]) -> list[dict[str, str]]:
+    """Upload every archive file (original + full-data export) to Cloudinary."""
+    return [upload_recipient_list(content, name) for content, name in files]
