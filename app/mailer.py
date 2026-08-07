@@ -1,34 +1,48 @@
 import json
-import os
 import re
-from pathlib import Path
 
 import requests
-from dotenv import load_dotenv
 
-_APP_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _APP_DIR.parent
+from app import config
 
 
-def _load_env() -> None:
-    load_dotenv(_PROJECT_ROOT / ".env", override=True)
-    load_dotenv(_APP_DIR / ".env", override=True)
+def _extract_provider_id(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    for key in ("request_id", "message_id", "id"):
+        value = payload.get(key)
+        if value:
+            return str(value)[:255]
+    data = payload.get("data")
+    if isinstance(data, list) and data:
+        first = data[0]
+        if isinstance(first, dict):
+            for key in ("message_id", "request_id", "code"):
+                value = first.get(key)
+                if value:
+                    return str(value)[:255]
+    elif isinstance(data, dict):
+        for key in ("message_id", "request_id", "code"):
+            value = data.get(key)
+            if value:
+                return str(value)[:255]
+    return None
 
 
-def send_email(to_email: str, subject: str, body: str, banner_url: str):
+def send_email(to_email: str, subject: str, body: str, banner_url: str) -> dict:
     """
     Sends email using ZeptoMail REST API.
-    This version is for the E drive codebase which uses a single banner_url string.
+    Returns {"provider_response_id": str|None, "raw": dict}.
     """
-    _load_env()
-    zepto_token = (os.getenv("SMTP_PASSWORD") or os.getenv("ZEPTO_API_TOKEN") or "").strip()
+    config.load_settings()
+    zepto_token = config.get_zepto_token()
     if not zepto_token:
         raise RuntimeError("Missing SMTP_PASSWORD or ZEPTO_API_TOKEN in environment.")
-    SENDER_EMAIL = os.getenv("SENDER_EMAIL", "support@harishcriticalcareclasses.com")
-    SENDER_NAME = os.getenv("SENDER_NAME", "Harish Critical Care Classes")
-    API_URL = "https://api.zeptomail.in/v1.1/email"
 
-    # Step 1: Format the body
+    sender_email = config.get_sender_email()
+    sender_name = config.get_sender_name()
+    api_url = config.ZEPTO_API_URL
+
     formatted_body = body.replace("\n", "<br>")
     url_pattern = r"(https?://\S+)"
 
@@ -44,7 +58,6 @@ def send_email(to_email: str, subject: str, body: str, banner_url: str):
 
     formatted_body = re.sub(url_pattern, link_to_button, formatted_body)
 
-    # Step 2: Create HTML Body
     html_body = f"""
     <html>
     <body>
@@ -56,41 +69,45 @@ def send_email(to_email: str, subject: str, body: str, banner_url: str):
     </html>
     """
 
-    # Step 3: Prepare API Payload
     payload = {
         "from": {
-            "address": SENDER_EMAIL,
-            "name": SENDER_NAME
+            "address": sender_email,
+            "name": sender_name,
         },
         "to": [
             {
                 "email_address": {
-                    "address": to_email
+                    "address": to_email,
                 }
             }
         ],
         "subject": subject,
-        "htmlbody": html_body
+        "htmlbody": html_body,
     }
 
-    # Step 4: Send API Request
     headers = {
         "accept": "application/json",
         "content-type": "application/json",
-        "authorization": f"Zoho-enczapikey {zepto_token}"
+        "authorization": f"Zoho-enczapikey {zepto_token}",
     }
 
     try:
-        response = requests.post(API_URL, headers=headers, data=json.dumps(payload))
-        
-        if response.status_code != 200 and response.status_code != 201:
+        response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+
+        if response.status_code not in (200, 201):
             error_data = response.json()
-            error_msg = error_data.get("error", {}).get("details", [{}])[0].get("message", "Unknown error")
-            raise Exception(f"ZeptoMail API Error: {error_msg}")
-                
-        return response.json()
-        
+            error_msg = (
+                error_data.get("error", {})
+                .get("details", [{}])[0]
+                .get("message", "Unknown error")
+            )
+            raise RuntimeError(f"ZeptoMail API Error: {error_msg}")
+
+        raw = response.json()
+        return {
+            "provider_response_id": _extract_provider_id(raw),
+            "raw": raw,
+        }
+
     except requests.exceptions.RequestException as e:
-        raise Exception(f"Failed to connect to ZeptoMail API: {str(e)}")
-    except Exception as e:
-        raise Exception(str(e))
+        raise RuntimeError(f"Failed to connect to ZeptoMail API: {e}") from e

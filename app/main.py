@@ -1,34 +1,43 @@
-import os
 import sys
 from pathlib import Path
 
-# Add project root to Python path
 project_root = Path(__file__).parent.parent
 if str(project_root) not in sys.path:
     sys.path.insert(0, str(project_root))
 
-from dotenv import load_dotenv
-
-load_dotenv(project_root / ".env", override=True)
-load_dotenv(Path(__file__).parent / ".env", override=True)
-
 from fastapi import FastAPI, UploadFile, Form, File
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from app.mailer import send_email
-from app.cloudinary_utils import upload_banner, upload_all_recipient_lists
-from app.data_archive import read_recipient_file, build_storage_files
 from mangum import Mangum
 
-app = FastAPI()
+from app.config import CORS_ORIGINS, load_settings
+from app.db import ensure_schema, mysql_configured
+from app.routes.analytics import router as analytics_router
+from app.services.send import SendEmailsError, process_send_emails
+
+load_settings()
+
+app = FastAPI(title="CEDAT Email Automation")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(analytics_router)
+
+
+@app.on_event("startup")
+def _startup_schema() -> None:
+    if mysql_configured():
+        try:
+            ensure_schema()
+            print("MySQL analytics schema ready.")
+        except Exception as e:
+            print(f"MySQL schema init skipped/failed: {e}")
 
 
 @app.post("/send-emails")
@@ -39,58 +48,21 @@ async def send_emails(
     csv_file: UploadFile = File(...),
 ):
     banner_bytes = await banner.read()
+    list_bytes = await csv_file.read()
+
     try:
-        banner_url = upload_banner(banner_bytes, banner.filename or "banner.jpg")
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Failed to upload banner to Cloudinary: {str(e)}"},
+        result = process_send_emails(
+            subject=subject,
+            content=content,
+            banner_bytes=banner_bytes,
+            banner_filename=banner.filename,
+            list_bytes=list_bytes,
+            list_filename=csv_file.filename,
         )
+    except SendEmailsError as e:
+        return JSONResponse(status_code=e.status_code, content={"error": e.message})
 
-    contents = await csv_file.read()
-
-    try:
-        data = read_recipient_file(contents, csv_file.filename)
-    except Exception as e:
-        return JSONResponse(status_code=400, content={"error": f"Failed to read file: {str(e)}"})
-
-    email_column = None
-    for col in data.columns:
-        if str(col).strip().lower() in ["email", "email address"]:
-            email_column = col
-            break
-
-    if not email_column:
-        return JSONResponse(status_code=400, content={"error": "Email column not found in the file."})
-
-    try:
-        storage_files = build_storage_files(data, contents, csv_file.filename)
-        list_assets = upload_all_recipient_lists(storage_files)
-    except Exception as e:
-        return JSONResponse(
-            status_code=500,
-            content={"error": f"Failed to store recipient list on Cloudinary: {str(e)}"},
-        )
-
-    emails = data[email_column].dropna().astype(str).tolist()
-    emails = [e.strip() for e in emails if str(e).strip()]
-
-    for email in emails:
-        try:
-            send_email(email, subject, content, banner_url)
-        except Exception as e:
-            print(f"Failed to send email to {email}: {e}")
-
-    columns = [str(c) for c in data.columns.tolist()]
-
-    return {
-        "message": "Emails sent!",
-        "rows_stored": len(data),
-        "columns_stored": columns,
-        "files_stored": list_assets,
-        "list_stored_at": list_assets[-1]["folder"] if list_assets else "cedat/email-lists",
-        "list_public_id": list_assets[-1]["public_id"] if list_assets else None,
-    }
+    return result.model_dump()
 
 
 handler = Mangum(app)

@@ -1,3 +1,12 @@
+import type {
+  AnalyticsSummary,
+  CampaignDetail,
+  CampaignListItem,
+  FailureItem,
+  SendEmailsResponse,
+  VolumePoint,
+} from '../types/email'
+
 const DEFAULT_API_BASE =
   'https://nxvkvdws672xre7dwuxhajx67u0mplyd.lambda-url.ap-south-1.on.aws'
 
@@ -7,27 +16,48 @@ function apiBaseUrl(): string {
   return trimmed || DEFAULT_API_BASE
 }
 
-export async function sendEmails(formData: FormData): Promise<Response> {
-  const base = apiBaseUrl()
+async function parseJson<T>(response: Response): Promise<T> {
   try {
-    const response = await fetch(`${base}/send-emails`, {
+    return (await response.json()) as T
+  } catch {
+    return {} as T
+  }
+}
+
+async function getJson<T>(path: string): Promise<T> {
+  const response = await fetch(`${apiBaseUrl()}${path}`)
+  const data = await parseJson<T & { error?: string }>(response)
+  if (!response.ok) {
+    throw new Error(data.error || `Server error: ${response.status} ${response.statusText}`)
+  }
+  return data
+}
+
+function withQuery(path: string, params: Record<string, string | number | undefined>): string {
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== '') qs.set(key, String(value))
+  }
+  const query = qs.toString()
+  return query ? `${path}?${query}` : path
+}
+
+export async function sendEmails(formData: FormData): Promise<SendEmailsResponse> {
+  try {
+    const response = await fetch(`${apiBaseUrl()}/send-emails`, {
       method: 'POST',
       body: formData,
     })
 
+    const data = await parseJson<SendEmailsResponse>(response)
+
     if (!response.ok) {
-      let errorMessage = `Server error: ${response.status} ${response.statusText}`
-      try {
-        const errorData = (await response.json()) as { error?: string }
-        errorMessage = errorData.error ?? errorMessage
-      } catch {
-        const text = await response.text()
-        errorMessage = text || errorMessage
-      }
-      throw new Error(errorMessage)
+      throw new Error(
+        data.error || `Server error: ${response.status} ${response.statusText}`,
+      )
     }
 
-    return response
+    return data
   } catch (error: unknown) {
     if (
       error instanceof TypeError &&
@@ -40,4 +70,49 @@ export async function sendEmails(formData: FormData): Promise<Response> {
     }
     throw error
   }
+}
+
+export async function fetchAnalyticsSummary(params: {
+  from?: string
+  to?: string
+}): Promise<AnalyticsSummary> {
+  return getJson(
+    withQuery('/analytics/summary', { from: params.from, to: params.to }),
+  )
+}
+
+export async function fetchCampaigns(params: {
+  from?: string
+  to?: string
+  q?: string
+  limit?: number
+  offset?: number
+}): Promise<{ total: number; items: CampaignListItem[] }> {
+  return getJson(
+    withQuery('/analytics/campaigns', {
+      from: params.from,
+      to: params.to,
+      q: params.q,
+      limit: params.limit,
+      offset: params.offset,
+    }),
+  )
+}
+
+export async function fetchCampaignDetail(id: string): Promise<CampaignDetail> {
+  return getJson(`/analytics/campaigns/${encodeURIComponent(id)}`)
+}
+
+export async function fetchVolume(params: {
+  from?: string
+  to?: string
+}): Promise<{ items: VolumePoint[] }> {
+  return getJson(withQuery('/analytics/volume', { from: params.from, to: params.to }))
+}
+
+export async function fetchFailures(params: {
+  from?: string
+  to?: string
+}): Promise<{ items: FailureItem[] }> {
+  return getJson(withQuery('/analytics/failures', { from: params.from, to: params.to }))
 }

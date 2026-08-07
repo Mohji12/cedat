@@ -41,6 +41,20 @@ def read_recipient_file(contents: bytes, filename: str | None) -> pd.DataFrame:
     raise ValueError("Unsupported file format. Please upload a CSV or Excel file.")
 
 
+def find_email_column(data: pd.DataFrame) -> str | None:
+    """Return the column name that holds email addresses, if present."""
+    for col in data.columns:
+        if str(col).strip().lower() in ("email", "email address"):
+            return col
+    return None
+
+
+def extract_emails(data: pd.DataFrame, email_column: str) -> list[str]:
+    """Extract non-empty trimmed email strings from a column."""
+    values = data[email_column].dropna().astype(str).tolist()
+    return [e.strip() for e in values if str(e).strip()]
+
+
 def build_full_data_archive(data: pd.DataFrame, filename: str | None) -> tuple[bytes, str]:
     """
     Serialize the entire parsed sheet (all columns, all rows) for Cloudinary storage.

@@ -1,29 +1,20 @@
 import io
-import os
 import uuid
 from datetime import datetime, timezone
-from pathlib import Path, PurePosixPath
+from pathlib import PurePosixPath
 
 import cloudinary
 import cloudinary.uploader
-from dotenv import load_dotenv
 
-_APP_DIR = Path(__file__).resolve().parent
-_PROJECT_ROOT = _APP_DIR.parent
+from app import config
 
-
-def _load_env() -> None:
-    """Load env files on each configure call (uvicorn --reload does not watch .env)."""
-    load_dotenv(_PROJECT_ROOT / ".env", override=True)
-    load_dotenv(_APP_DIR / ".env", override=True)
+_configured = False
 
 
 def _configure() -> None:
-    _load_env()
+    global _configured
+    cloud_name, api_key, api_secret, url = config.get_cloudinary_credentials()
 
-    cloud_name = (os.getenv("CLOUDINARY_CLOUD_NAME") or "").strip()
-    api_key = (os.getenv("CLOUDINARY_API_KEY") or "").strip()
-    api_secret = (os.getenv("CLOUDINARY_API_SECRET") or "").strip()
     if cloud_name and api_key and api_secret:
         cloudinary.config(
             cloud_name=cloud_name,
@@ -31,18 +22,20 @@ def _configure() -> None:
             api_secret=api_secret,
             secure=True,
         )
+        _configured = True
         return
 
-    url = (os.getenv("CLOUDINARY_URL") or "").strip()
     if url:
+        import os
+
         os.environ["CLOUDINARY_URL"] = url
         cloudinary.config(secure=True)
+        _configured = True
         return
 
     raise RuntimeError(
         "Missing Cloudinary config. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, "
-        "and CLOUDINARY_API_SECRET in app/.env "
-        f"(checked {_APP_DIR / '.env'})."
+        "and CLOUDINARY_API_SECRET (or CLOUDINARY_URL)."
     )
 
 
