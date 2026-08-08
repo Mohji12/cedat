@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from mangum import Mangum
 
-from app.config import CORS_ORIGINS, load_settings
+from app.config import CORS_ORIGIN_REGEX, CORS_ORIGINS, load_settings
 from app.db import ensure_schema, mysql_configured
 from app.routes.analytics import router as analytics_router
 from app.services.send import SendEmailsError, process_send_emails
@@ -22,6 +22,7 @@ app = FastAPI(title="CEDAT Email Automation")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=CORS_ORIGINS,
+    allow_origin_regex=CORS_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

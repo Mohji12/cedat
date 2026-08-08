@@ -26,16 +26,28 @@ def env(name: str, default: str = "") -> str:
     return (os.getenv(name) or default).strip()
 
 
-CORS_ORIGINS = [
-    origin
-    for origin in [
+def _cors_origins() -> list[str]:
+    origins: list[str] = []
+    defaults = [
+        "https://staging.djrmd1qw4vs3h.amplifyapp.com",
         "https://staging.dlg2wln5wgzi2c.amplifyapp.com",
         "https://cedat.krintix.in",
+        "https://cedat.mijnlevenspad.com",
         "http://localhost:5173",
-        env("CORS_ORIGIN_EXTRA"),
+        "http://127.0.0.1:5173",
     ]
-    if origin
-]
+    extra = env("CORS_ORIGINS") or env("CORS_ORIGIN_EXTRA")
+    for value in [*defaults, extra]:
+        for part in value.split(","):
+            origin = part.strip().rstrip("/")
+            if origin and origin not in origins:
+                origins.append(origin)
+    return origins
+
+
+CORS_ORIGINS = _cors_origins()
+# Amplify preview/staging hosts change when the app is recreated.
+CORS_ORIGIN_REGEX = r"https://.*\.amplifyapp\.com"
 
 ZEPTO_API_URL = "https://api.zeptomail.in/v1.1/email"
 
