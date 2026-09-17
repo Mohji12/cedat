@@ -29,6 +29,7 @@ def env(name: str, default: str = "") -> str:
 def _cors_origins() -> list[str]:
     origins: list[str] = []
     defaults = [
+        "https://cedat-gules.vercel.app",
         "https://staging.d2iyruqxvegk0e.amplifyapp.com",
         "https://staging.djrmd1qw4vs3h.amplifyapp.com",
         "https://staging.dlg2wln5wgzi2c.amplifyapp.com",
@@ -48,8 +49,8 @@ def _cors_origins() -> list[str]:
 
 
 CORS_ORIGINS = _cors_origins()
-# Amplify preview/staging hosts change when the app is recreated.
-CORS_ORIGIN_REGEX = r"https://([a-z0-9-]+\.)*amplifyapp\.com"
+# Preview hosts change often (Amplify + Vercel).
+CORS_ORIGIN_REGEX = r"https://([a-z0-9-]+\.)*(amplifyapp\.com|vercel\.app)"
 
 ZEPTO_API_URL = "https://api.zeptomail.in/v1.1/email"
 
