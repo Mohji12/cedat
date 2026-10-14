@@ -41,15 +41,16 @@ def _startup_schema() -> None:
             print(f"MySQL schema init skipped/failed: {e}")
 
 
+# Sync handler so FastAPI runs it in a worker thread; a long send must not block the event loop.
 @app.post("/send-emails")
-async def send_emails(
+def send_emails(
     subject: str = Form(...),
     content: str = Form(...),
     banner: UploadFile = File(...),
     csv_file: UploadFile = File(...),
 ):
-    banner_bytes = await banner.read()
-    list_bytes = await csv_file.read()
+    banner_bytes = banner.file.read()
+    list_bytes = csv_file.file.read()
 
     try:
         result = process_send_emails(

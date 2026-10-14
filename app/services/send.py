@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from app.analytics_store import RecipientOutcome, save_campaign
 from app.cloudinary_utils import upload_all_recipient_lists, upload_banner
 from app.data_archive import (
@@ -8,6 +10,7 @@ from app.data_archive import (
     find_email_column,
     read_recipient_file,
 )
+from app.config import get_send_concurrency
 from app.mailer import send_email
 from app.schemas import SendEmailsResponse
 
@@ -17,6 +20,24 @@ class SendEmailsError(Exception):
         super().__init__(message)
         self.message = message
         self.status_code = status_code
+
+
+def _send_one(email: str, subject: str, content: str, banner_url: str) -> RecipientOutcome:
+    try:
+        result = send_email(email, subject, content, banner_url)
+        provider_id = result.get("provider_response_id") if isinstance(result, dict) else None
+        return RecipientOutcome(
+            email=email,
+            status="sent",
+            provider_response_id=str(provider_id) if provider_id else None,
+        )
+    except Exception as e:
+        print(f"Failed to send email to {email}: {e}")
+        return RecipientOutcome(
+            email=email,
+            status="failed",
+            error_message=str(e)[:2000],
+        )
 
 
 def _detect_source(list_filename: str | None) -> str:
@@ -63,33 +84,16 @@ def process_send_emails(
 
     emails = extract_emails(data, email_column)
 
-    emails_sent = 0
-    emails_failed = 0
     outcomes: list[RecipientOutcome] = []
-    for email in emails:
-        try:
-            result = send_email(email, subject, content, banner_url)
-            provider_id = None
-            if isinstance(result, dict):
-                provider_id = result.get("provider_response_id")
-            emails_sent += 1
-            outcomes.append(
-                RecipientOutcome(
-                    email=email,
-                    status="sent",
-                    provider_response_id=str(provider_id) if provider_id else None,
-                )
+    if emails:
+        workers = min(get_send_concurrency(), len(emails))
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            outcomes = list(
+                pool.map(lambda addr: _send_one(addr, subject, content, banner_url), emails)
             )
-        except Exception as e:
-            emails_failed += 1
-            print(f"Failed to send email to {email}: {e}")
-            outcomes.append(
-                RecipientOutcome(
-                    email=email,
-                    status="failed",
-                    error_message=str(e)[:2000],
-                )
-            )
+
+    emails_sent = sum(1 for o in outcomes if o.status == "sent")
+    emails_failed = len(outcomes) - emails_sent
 
     total = len(emails)
     if total == 0:

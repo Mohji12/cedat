@@ -92,7 +92,12 @@ def send_email(to_email: str, subject: str, body: str, banner_url: str) -> dict:
     }
 
     try:
-        response = requests.post(api_url, headers=headers, data=json.dumps(payload))
+        response = requests.post(
+            api_url,
+            headers=headers,
+            data=json.dumps(payload),
+            timeout=config.ZEPTO_TIMEOUT_SECONDS,
+        )
 
         if response.status_code not in (200, 201):
             error_data = response.json()

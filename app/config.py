@@ -53,6 +53,16 @@ CORS_ORIGINS = _cors_origins()
 CORS_ORIGIN_REGEX = r"https://([a-z0-9-]+\.)*(amplifyapp\.com|vercel\.app)"
 
 ZEPTO_API_URL = "https://api.zeptomail.in/v1.1/email"
+ZEPTO_TIMEOUT_SECONDS = 30
+
+
+def get_send_concurrency() -> int:
+    load_settings()
+    try:
+        value = int(env("SEND_CONCURRENCY", "10"))
+    except ValueError:
+        value = 10
+    return max(1, min(value, 25))
 
 
 def get_zepto_token() -> str:
