@@ -36,6 +36,7 @@ def _cors_origins() -> list[str]:
         "https://cedat.krintix.in",
         "https://cedat.mijnlevenspad.com",
         "https://cedat.menteetracker.com",
+        "https://cedat.nowestinterior.co.uk",
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ]

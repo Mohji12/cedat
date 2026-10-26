@@ -7,7 +7,7 @@ import type {
   VolumePoint,
 } from '../types/email'
 
-const DEFAULT_API_BASE = 'https://cedat.menteetracker.com'
+const DEFAULT_API_BASE = 'https://cedat.nowestinterior.co.uk'
 
 function apiBaseUrl(): string {
   const raw = import.meta.env.VITE_API_BASE_URL as string | undefined
